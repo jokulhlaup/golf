@@ -120,83 +120,6 @@ C55=Function(Q)
 #Get vertex (DG = more) count
 m=C00.vector()
 m=m.size()
-#
-#
-##############################################
-##Use icetools as a control##################
-##############################################
-##################################################################################
-## Define the body force f, i.e. gravity. Here I use a rotated coordinate
-## system similar to the Cuffey & Paterson p. 295 Fig. 8.5a, just in 3D 
-#alpha = 10.0            # inclination of glacier
-#alphar = alpha*pi/180
-#g = -9.81               # gravitational constant
-#rho = 917.0             # ice density
-#f_x0 = sin(alphar)*g*rho
-#f_x2 = cos(alphar)*g*rho
-### A note here on how Fenics defines coordinates
-### x[0] == x
-### x[1] == y
-### x[2] == z
-#f = Constant((f_x0, 0, f_x2))
-#
-#Aglen = 2.4e-24         # Glen flow parameter for temperate ice (Cuffey & Paterson,2010 p. 73)
-#nglen = 3.0             # Glen's n
-#nu = Constant(8e13)     # initial viscosity of ice, before viscosity iteration
-#
-## Load the mesh from a gmsh generated file
-##ProblemMesh = Mesh("column3D.xml.gz")
-## or select Fenics generated mesh. To use this mesh, uncomment the line below.
-## Note that nx, ny, nz define the number of mesh points in each dimension.
-## nx = 4
-## ny = nx
-## nz = 3*nx
-##ProblemMesh = Box(0, 0, 0, qs_length, qs_length, qs_height, nx, ny, nz)
-#
-## Define the sub domains for the boundary conditions
-#def NoslipBoundary(x, on_boundary):
-#    return x[2] < DOLFIN_EPS and on_boundary
-#
-## Define the periodic boundary on the vertical faces in X direction
-#class PeriodicBoundary_x(SubDomain):
-#
-#    def inside(self, x, on_boundary):
-#        return x[0] == 0 and on_boundary
-#
-#    def map(self, x, y):
-#        y[0] = x[0] - cs_length
-#        y[1] = x[1]
-#        y[2] = x[2]
-## Define the periodic boundary on the vertical faces in Y direction
-#class PeriodicBoundary_y(SubDomain):
-#
-#    def inside(self, x, on_boundary):
-#        return x[1] == 0 and on_boundary
-#
-#    def map(self, x, y):
-#        y[1] = x[1] - cs_length
-#        y[0] = x[0]
-#        y[2] = x[2]   
-
-# Apply a no-slip boundary condition for velocity
-#noslip = Constant((0,0,0))
-#bc0 = DirichletBC(Y.sub(0), noslip, NoslipBoundary)
-## Apply the periodic boundary condition in X
-#pbc_x = PeriodicBoundary_x()
-#bc1 = PeriodicBC(Y.sub(0), pbc_x)
-## Apply the periodic boundary condition in Y
-#pbc_y = PeriodicBoundary_y()
-#bc2 = PeriodicBC(Y.sub(0), pbc_y)
-
-# Collect boundary conditions
-#bc = [bc0, bc1, bc2]
-
-
-
-###############################################################
-###############################################################
-#End###############################
-
 (u, p) = TrialFunctions(Y)
 (v, q) = TestFunctions(Y)
 #####################
@@ -204,13 +127,13 @@ nu=Constant(8e4)
 nu_lim= 1e25 #Pa/s #1e15
 f=Constant(("0.0","0.0","0.0"))
 
-W=np.empty([m,6])
-W[:,0]=3.5*10**-25 #Pa^3 s
-W[:,1]=3.0
-W[:,2]=6.4*10**4 #J/mol
-W[:,3]=11.5*10**4 #J/mol
-W[:,4]=268 #K
-W[:,5]=263 #263+2*10**-8 *Pressure
+
+W0=Constant(3.5*10**-25) #Pa^3 s
+W1=Constant(3.0)
+W2=Constant(6.4*10**4) #J/mol
+W3=Constant(11.5*10**4) #J/mol
+W4=Constant(268) #K
+W5=Constant(263) #263+2*10**-8 *Pressure
 
 RelError=1
 
@@ -290,28 +213,6 @@ C05.vector()[:]=C[:,0,5]
 print np.array(C22.vector()[:]).shape
 print np.array(C22.vector()[:])
 
-
-def nrvisc(u,W):
-    
-    epsxx = (u[0].dx(0))
-    epsyy = (u[1].dx(1))
-    epszz = (u[2].dx(2))
-    epsxy = (0.5*(u[0].dx(1) + u[1].dx(0)))
-    epsxz = (0.5*(u[0].dx(2) + u[2].dx(0)))
-    epsyz = (0.5*(u[1].dx(2) + u[2].dx(1)))
-    eps0 = (0.5*(epsxx**2 + epsyy**2 + epszz**2 + 2*epsxy**2 + 2*epsxz**2 + 2*epsyz**2))
- 
-    #nu=opil.golf.nrvisc(W,eps_e) 
-    #Converting function vals np array gets error with f2py. Do in Python:
-    R=8.131
-    Q=((W[:,5] >= W[:,4])*W[:,2] + (W[:,5] > W[:,4])*W[:,3]) 
-    W=W 
-    nu=0.5*W[:,0]*np.exp(-Q/R*(1/W[:,4]-1/W[:,5]))*pow(eps0,((1-W[:,1])/W[:,1]))
-
-    print nu.shape
-
-    return nu
-
 class GolfFlow(NonlinearVariationalProblem):
    def __init__(self,a,L,bcs):
       self.L=L
@@ -325,116 +226,72 @@ class GolfFlow(NonlinearVariationalProblem):
       #Sparsity should be the same. Don't redo it after the first time.
 
 
-nu=1
+#############################
+##Define nonlinear viscosity#
+#############################
+epsxx = (u[0].dx(0))
+epsyy = (u[1].dx(1))
+epszz = (u[2].dx(2))
+epsxy = (0.5*(u[0].dx(1) + u[1].dx(0)))
+epsxz = (0.5*(u[0].dx(2) + u[2].dx(0)))
+epsyz = (0.5*(u[1].dx(2) + u[2].dx(1)))
+eps0 = (0.5*(epsxx**2 + epsyy**2 + epszz**2 + 2*epsxy**2 + 2*epsxz**2 + 2*epsyz**2))
+ 
+#nu=opil.golf.nrvisc(W,eps_e) 
+#Converting function vals np array gets error with f2py. Do in Python:
+R=8.131
+Q=(gt(W5,W4)*W2 + gt(W5,W4)*W3) 
+nu=0.5*W0*exp(-Q/R*(1/W4-1/W5))*(eps0**((1-W1)/W1))
+#############################
+##########
+#############################
+print nu.shape
+
+
+
 eps=10e-6
-#Iterate for viscosity
-while (RelError>RelTol) & (nViscIter<=MaxViscIter):
 
-   #Copy the old u to u_l
-
-#a=   nu*(u[i]*v[i])*dx #test
 #This takes a long time to assemble.
-   a=    (v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
-       +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
-       +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
-       +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
-       +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
-       +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
-       + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx + 1e-9*p*q*dx 
-   C00f = File("C22.pvd")
-   C00f = C22
-   #This is the isotropic Stokes flow case
-#   a=C22*(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx # 10e-16*p*q*dx
-   L=f[i]*v[i]*dx
+nu=lambda u: nrvisc(u,W)
+a=    nu*(v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
+    +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
+    +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
+    +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
+    +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
+    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
+    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx + 1e-9*p*q*dx - f[i]*v[i]*dx
+
+C00f = File("C22.pvd")
+C00f = C22
+#This is the isotropic Stokes flow case
+#a=C22*(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx # 10e-16*p*q*dx
+
+#Assemble main system
+A,B=assemble_system(a,L,bc)
+
+#Assemble preconditioner
+#P,b=assemble_system(bs,L,bc)
+
+
+nViscIter=nViscIter+1
+print "Viscosity iteration:", nViscIter
+#FlowProblem = LinearVariationalProblem(a,L,Up, bcs=bc)
+solve(a==0,B,"tfqmr","amg")
+#isolver.set_operators(A,P)
+#solver.solve(Up.vector(),B) 
+
+
+#solve(a == L, Up, bcs=bc)
+
+(U,P)=Up.split(deepcopy=True)
+#Compute the new relative error
+if nViscIter > 1:
+   RelError = errornorm(U,U_l,mesh=ProblemMesh) 
    
-   #Assemble the preconditioner matrix
-   #Might want to figure out how to do this for the anisotropic case.
-   #Can always use standard preconditioner
-#   bs=nu*u[i].dx(j)*v[i].dx(j)*dx + p*q*dx
-#   bs=  nu*(v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
-#   +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
-#   +2*v[0].dx(1)*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
-#   +2*v[0].dx(2)*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
-#   +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
-#   +2*v[1].dx(2)*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx
 
-   #Assemble main system
-   A,B=assemble_system(a,L,bc)
-
-   #Assemble preconditioner
-#   P,b=assemble_system(bs,L,bc)
-   
-
-   nViscIter=nViscIter+1
-   print "Viscosity iteration:", nViscIter
-#   FlowProblem = LinearVariationalProblem(a,L,Up, bcs=bc)
-   solve(A,Up.vector(),B,"tfqmr","amg")
-#   isolver.set_operators(A,P)
-#   solver.solve(Up.vector(),B) 
-
-
-#   solve(a == L, Up, bcs=bc)
-
-   #Count
-#   FlowProblem = LinearVariationalProblem(a,L,Up, bcs=bc)
-#   solver=LinearVariationalSolver(FlowProblem)
-#   solver.parameters["linear_solver"] =  "cholesky"
-#   solver.parameters["preconditioner"] = "ilu"
-#   solver.solve()
-   
-   (U,P)=Up.split(deepcopy=True)
-   #Compute the new relative error
-   if nViscIter > 1:
-      RelError = errornorm(U,U_l,mesh=ProblemMesh) 
-      
-   
-   if RelError > RelTol:
-      #Now iterate for viscosity
-      #First get the effective strain rate
-      #V_v=FunctionSpace(ProblemMesh,"CG",3)
-      nut=TrialFunction(Q)
-      r=TestFunction(Q)
-      nu = Function(Q)
-      nu=nrvisc(U,W)
-
-#      av=inner(nut,r)*dx
-#      bv=inner(nrvisc(U,W),r)*dx
-#      AV=assemble(av)
-#      BV=assemble(bv)
-#      solve(AV,nu.vector(),BV)
-      
-      #solve(av==bv,nu)
-      #assemble_system(AV,BV,av,bv)
-      #solve(AV,nu.vector(),BV,"ilu")
-      
-#nu_out=nu.vector < nu_lim
-      #nu.vector[nu_out]=nu_lim
-#      print 'max',  np.max(nu.vector)
-#      print 'min',  np.min(nu.vector)
-      #nu0=fab_utils.nrvisc(U,W)
-       
-
-
-      #eta_e=assemble(F)
-
-      #ViscosityProblem = LinearVariationalProblem(a_v,L_v,nu)
-      #solver=LinearVariationalSolver(ViscosityProblem)
-      #solver.parameters["linear_solver"] = "gmres"
-      #solver.parameters["preconditioner"] = "ilu"
-      #solver.solve
-
-      #Compute the nr viscosity
-      # Calculate the non-linear viscosity as a variational form  
-#      a_s = inner(w_s,v_s)*dx
-#      L_s = inner(nu_ice(u), v_s)*dx
-#      nu = Function(V_s)
-      # Solve for viscosity
-#      solve(a_s==L_s,nu)      
-   #nViscIter=50 
-   #Append the new velocity
-   U_sol=np.append(U_sol,U)
-   #Set the U to U_l
-   U_l=U
+U_sol=np.append(U_sol,U)
+#Set the U to U_l
+U_l=U
 #   nuf=File("nu.pvd")
 #   nuf << nu
 #Save U to file

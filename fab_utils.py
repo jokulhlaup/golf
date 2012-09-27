@@ -4,7 +4,7 @@ import numpy as np
 import scipy as sp
 from dolfin import *
 import scipy.linalg as linalg
-import opil
+#import opil as opil
 import fec
 
 
