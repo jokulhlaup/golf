@@ -115,7 +115,7 @@ C55=Function(Q)
 #Get vertex (DG = more) count
 m=C00.vector()
 m=m.size()
-(u, p) = TrialFunctions(Y)
+(u,p) = TrialFunctions(Y)
 (v, q) = TestFunctions(Y)
 #####################
 nu=Constant(8e4)
@@ -235,8 +235,9 @@ eps0 = (0.5*(epsxx**2 + epsyy**2 + epszz**2 + 2*epsxy**2 + 2*epsxz**2 + 2*epsyz*
 #nu=opil.golf.nrvisc(W,eps_e) 
 #Converting function vals np array gets error with f2py. Do in Python:
 R=8.131
-Q=(gt(W5,W4)*W5*W2+gt(W4,W5)*W4*W2 + gt(W5,W4)*W3+W5+gt(W4,W5)*W3*W4) 
-nu=0.5*W0*exp(-Q/R*(1/W4-1/W5))*(eps0**((1-W1)/W1))
+Q1=conditional(gt(W4,W5),W5*W2,W4*W2) + conditional(gt(W5,W4),W5*W3,W3*W4)
+#nu=0.5*W0*exp(-Q/R*(1/W4-1/W5))*(eps0**((1-W1)/W1))
+nu=eps0
 #############################
 ##########
 #############################
@@ -248,30 +249,23 @@ eps=10e-6
 
 #This takes a long time to assemble.
 nu=lambda u: nrvisc(u,W)
-a=    nu*(v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
-    +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
-    +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
-    +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
-    +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
-    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
-    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx + 1e-9*p*q*dx - f[i]*v[i]*dx
+#a=    nu*(v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
+#    +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
+#    +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
+#    +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
+#    +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
+#    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
+#    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx  #- f[i]*v[i]*dx
 
 C00f = File("C22.pvd")
 C00f = C22
 #This is the isotropic Stokes flow case
-#a=C22*(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx # 10e-16*p*q*dx
+a=(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx # 10e-16*p*q*dx
+U=Function(V)
+P=Function(Q)
+a=action(a,U,P)
 
-#Assemble main system
-A,B=assemble_system(a,L,bc)
-
-#Assemble preconditioner
-#P,b=assemble_system(bs,L,bc)
-
-
-nViscIter=nViscIter+1
-print "Viscosity iteration:", nViscIter
-#FlowProblem = LinearVariationalProblem(a,L,Up, bcs=bc)
-solve(a==0,B,"tfqmr","amg")
+solve(a==0,U,bcs=bc)
 #isolver.set_operators(A,P)
 #solver.solve(Up.vector(),B) 
 

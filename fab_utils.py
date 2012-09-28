@@ -4,8 +4,8 @@ import numpy as np
 import scipy as sp
 from dolfin import *
 import scipy.linalg as linalg
-#import opil as opil
-import fec
+import opil as opil
+import fec2
 
 
 #Gets the second order orientation tensor for discrete fabrics
@@ -40,8 +40,8 @@ def get_A(c_axes):
 def pars(angles,evs):
   m = angles.shape[0]
 
-  if n != 3:
-    print 'Function pars(angles,evs) requires nx3 arrays as arguments'
+  if m != 3:
+    print('Function pars(angles,evs) requires nx3 arrays as arguments')
   C=opil.golf.cmat(evs,angles,m)
 
   return C
