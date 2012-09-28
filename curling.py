@@ -20,14 +20,11 @@ qs_height = 120.0       # height of ice column to be used in BC definition
 # Load the mesh from a gmsh generated file
 ProblemMesh = UnitCube(20,20,20)#Mesh("2cyl.xml.gz")
 
-
-
 ############################################################
 
 #######################
-V = VectorFunctionSpace(ProblemMesh, "DG", 2)# + VectorFunctionSpace(ProblemMesh, "B", 4)
+V = VectorFunctionSpace(ProblemMesh, "CG", 2)# + VectorFunctionSpace(ProblemMesh, "B", 4)
 Q = FunctionSpace(ProblemMesh, "CG",1)
-
 
 Y = V * Q
 
@@ -43,7 +40,9 @@ def top_bottom(x, on_boundary):
 noslip = Constant((0.0, 0.0, 0.0))
 bc0 = DirichletBC(Y.sub(0), noslip, top_bottom)
 
-sc=Constant(1/(3600*24*365))
+
+
+c=Constant(1/(3600*24*365))
 # Inflow boundary condition for velocity
 inflow = Expression(("sin(x[1]*pi)", "0.0", "0.0"))
 bc1 = DirichletBC(Y.sub(0), inflow, right)
@@ -54,10 +53,6 @@ bc2 = DirichletBC(Y.sub(1), zero, left)
 
 # Collect boundary conditions
 bc = [bc0, bc1, bc2]
-
-
-
-
 
 
 #Declare C
@@ -240,7 +235,7 @@ eps0 = (0.5*(epsxx**2 + epsyy**2 + epszz**2 + 2*epsxy**2 + 2*epsxz**2 + 2*epsyz*
 #nu=opil.golf.nrvisc(W,eps_e) 
 #Converting function vals np array gets error with f2py. Do in Python:
 R=8.131
-Q=(gt(W5,W4)*W2 + gt(W5,W4)*W3) 
+Q=(gt(W5,W4)*W5*W2+gt(W4,W5)*W4*W2 + gt(W5,W4)*W3+W5+gt(W4,W5)*W3*W4) 
 nu=0.5*W0*exp(-Q/R*(1/W4-1/W5))*(eps0**((1-W1)/W1))
 #############################
 ##########
