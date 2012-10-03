@@ -102,21 +102,11 @@ C53=Function(Q)
 C54=Function(Q)
 C55=Function(Q)
 
-
-
-
-
-
-
-
-
-
-
 #Get vertex (DG = more) count
 m=C00.vector()
 m=m.size()
 #(u,p) = TrialFunctions(Y)
-U=Function(Y)
+U=TrialFunction(Y)
 u,p=split(U)
 (v, q) = TestFunctions(Y)
 #####################
@@ -248,16 +238,16 @@ print nu.shape
 
 
 eps=10e-6
-f=Constant((0,0,0))
+f=Constant((1,1,1))
 #This takes a long time to assemble.
 nu=lambda u: nrvisc(u,W)
-a=    u[0].dx(0)*(v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
+a=    (v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
     +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
     +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
     +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
     +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
-    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx - f[i]*v[i]
-#    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx  #- f[i]*v[i]*dx
+    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
+    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -  f[i]*v[i]*dx
 
 C00f = File("C22.pvd")
 C00f = C22
