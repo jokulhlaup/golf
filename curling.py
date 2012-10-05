@@ -106,7 +106,7 @@ C55=Function(Q)
 m=C00.vector()
 m=m.size()
 #(u,p) = TrialFunctions(Y)
-U=TrialFunction(Y)
+U=Function(Y)
 u,p=split(U)
 (v, q) = TestFunctions(Y)
 #####################
@@ -200,10 +200,11 @@ C05.vector()[:]=C[:,0,5]
 print np.array(C22.vector()[:]).shape
 print np.array(C22.vector()[:])
 
-class GolfFlow(NonlinearVariationalProblem):
+class GolfFlow(NonlinearProblem):
    def __init__(self,a,L,bcs):
+      NonlinearProblem.__init__(self,a,L)
       self.L=L
-      self.a=A
+      self.a=a
       self.reset_sparsity=True
    def F(self,b,x):
       assemble(self.L,tensor=b)
@@ -238,28 +239,30 @@ print nu.shape
 
 
 eps=10e-6
-f=Constant((1,1,1))
+f=Constant((1,10,1))
 #This takes a long time to assemble.
 nu=lambda u: nrvisc(u,W)
-a=    (v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
-    +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
-    +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
-    +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
-    +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
-    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
-    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -  f[i]*v[i]*dx
+#a=    (v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
+#    +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
+#    +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
+#    +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
+#    +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
+#    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
+#    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx - f[i]*v[i]*dx
+
 
 C00f = File("C22.pvd")
 C00f = C22
 #This is the isotropic Stokes flow case
-#a=(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx # 10e-16*p*q*dx
+#a=nu*(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -f[i]*v[i]*dx# 10e-16*p*q*dx
 
-solve(a==0,U,bcs=bc)
-#isolver.set_operators(A,P)
+a=u[i].dx(j)*v[i].dx(j)*dx + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -f[i]*v[i]*dx 
+
 #solver.solve(Up.vector(),B) 
 
 
-#solve(a == L, Up, bcs=bc)
+solve(a == 0, U, bc,solver_parameters={'newton_solver':
+                                          {'relative_tolerance':1e-6}})
 
 (U,P)=Up.split(deepcopy=True)
 #Compute the new relative error
