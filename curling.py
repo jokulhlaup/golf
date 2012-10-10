@@ -23,19 +23,18 @@ ProblemMesh = UnitCube(20,20,20)#Mesh("2cyl.xml.gz")
 ############################################################
 
 #######################
-V = VectorFunctionSpace(ProblemMesh, "CG", 2)# + VectorFunctionSpace(ProblemMesh, "B", 4)
+V = VectorFunctionSpace(ProblemMesh, "CG", 2) #+ VectorFunctionSpace(ProblemMesh, "B", 4)
 Q = FunctionSpace(ProblemMesh, "CG",1)
-
+parameters.form_compiler.quadrature_degree=2
 Y = V * Q
 
 tol = 1.E-6
 
 # Boundaries
-def right(x, on_boundary): return x[0] > (1.0 - DOLFIN_EPS)
-def left(x, on_boundary): return x[0] < DOLFIN_EPS
+def right(x, on_boundary): return x[0] > (1.0 - DOLFIN_EPS) and on_boundary
+def left(x, on_boundary): return x[0] < DOLFIN_EPS and on_boundary
 def top_bottom(x, on_boundary):
-    return x[1] > 1.0 - DOLFIN_EPS or x[1] < DOLFIN_EPS
-
+    return x[1] > 1.0 - DOLFIN_EPS or x[1] < DOLFIN_EPS and on_boundary
 # No-slip boundary condition for velocity
 noslip = Constant((0.0, 0.0, 0.0))
 bc0 = DirichletBC(Y.sub(0), noslip, top_bottom)
@@ -44,7 +43,7 @@ bc0 = DirichletBC(Y.sub(0), noslip, top_bottom)
 
 c=Constant(1/(3600*24*365))
 # Inflow boundary condition for velocity
-inflow = Expression(("sin(x[1]*pi)", "0.0", "0.0"))
+inflow = Expression(("-sin(x[1]*pi)", "0.0", "0.0"))
 bc1 = DirichletBC(Y.sub(0), inflow, right)
 
 # Boundary condition for pressure at outflow
@@ -146,7 +145,6 @@ j=Index()
 
 
 Up=Function(Y)
-U=Function(Y)
 U_l=Function(V)
 #Define the "C" matrix (Gillet-Chaulet 2006)
 C=np.array(fab_utils.pars(Angle,ai),ndmin=3)
@@ -213,6 +211,11 @@ class GolfFlow(NonlinearProblem):
       self.reset_sparsity=False
       #Sparsity should be the same. Don't redo it after the first time.
 
+#Class for golf flow problem
+#Calculate jacobian with automatic differentiation.
+#class GolfFlow(NonlinearVariationalProblem):
+#   def __init__(self,F,u)
+    
 
 #############################
 ##Define nonlinear viscosity#
@@ -228,9 +231,9 @@ eps0 = (0.5*(epsxx**2 + epsyy**2 + epszz**2 + 2*epsxy**2 + 2*epsxz**2 + 2*epsyz*
 #nu=opil.golf.nrvisc(W,eps_e) 
 #Converting function vals np array gets error with f2py. Do in Python:
 R=8.131
-Q1=conditional(gt(W4,W5),W5*W2,W4*W2) + conditional(gt(W5,W4),W5*W3,W3*W4)
-#nu=0.5*W0*exp(-Q/R*(1/W4-1/W5))*(eps0**((1-W1)/W1))
-nu=eps0
+Qe=conditional(gt(W4,W5),W5*W2,W4*W2) + conditional(gt(W5,W4),W5*W3,W3*W4)
+nu=0.5*W0*exp(-Qe/R*(1/W4-1/W5))*(eps0**((1-W1)/W1))
+
 #############################
 ##########
 #############################
@@ -239,9 +242,9 @@ print nu.shape
 
 
 eps=10e-6
-f=Constant((1,10,1))
+f=Constant((0,0,0))
 #This takes a long time to assemble.
-nu=lambda u: nrvisc(u,W)
+#nu=lambda u: nrvisc(u,W)
 #a=    (v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
 #    +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
 #    +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
@@ -254,29 +257,33 @@ nu=lambda u: nrvisc(u,W)
 C00f = File("C22.pvd")
 C00f = C22
 #This is the isotropic Stokes flow case
-#a=nu*(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -f[i]*v[i]*dx# 10e-16*p*q*dx
+F=nu*(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -f[i]*v[i]*dx+ 10e-16*p*q*dx
 
-a=u[i].dx(j)*v[i].dx(j)*dx + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -f[i]*v[i]*dx 
-
+#F=u[i].dx(j)*v[i].dx(j)*dx + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -f[i]*v[i]*dx 
+#Compute Jacobian
+J=derivative(F,U)
+golfproblem=NonlinearVariationalProblem(F,U,bcs=bc,J=J)
+solver=NonlinearVariationalSolver(golfproblem)
+solver.parameters["linear_solver"]="lu"
+#solver.parameters["preconditioner"]="ilu"
+solver.solve()
 #solver.solve(Up.vector(),B) 
 
 
-solve(a == 0, U, bc,solver_parameters={'newton_solver':
-                                          {'relative_tolerance':1e-6}})
+#solve(a == 0, U, bc,solver_parameters={'newton_solver':
+#                                          {'relative_tolerance':1e-6}})
 
-(U,P)=Up.split(deepcopy=True)
 #Compute the new relative error
 if nViscIter > 1:
    RelError = errornorm(U,U_l,mesh=ProblemMesh) 
    
 
-U_sol=np.append(U_sol,U)
 #Set the U to U_l
-U_l=U
 #   nuf=File("nu.pvd")
 #   nuf << nu
 #Save U to file
+u,p=U.split(deepcopy=True)
 Uend = File("vel_fin.pvd")
-Uend << U
+Uend << u
 Pend = File("p_end.pvd")
-Pend << P
+Pend << p
