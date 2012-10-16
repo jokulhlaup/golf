@@ -104,8 +104,10 @@ C55=Function(Q)
 #Get vertex (DG = more) count
 m=C00.vector()
 m=m.size()
-#U=Function(Y)
-#u,p=split(U)
+U=Function(Y)
+u,p=split(U)
+#For Picard
+(u_p,p_p)=TrialFunctions(Y)
 (v, q) = TestFunctions(Y)
 
 #Define test/trial functions for viscosity
@@ -242,15 +244,16 @@ nrvisc = lambda u: nlvisc(u,W0,W1,W2,W3,W4,W5)
 eps=10e-6
 f=Constant((0,0,0))
 #This takes a long time to assemble.
-F=    nu*(v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
+F_p=    nu_p*(v[0].dx(0)*(C00*u_p[0].dx(0)+C01*u_p[1].dx(1)+C02*u_p[2].dx(2)+C03*u_p[1].dx(2)+C04*u_p[2].dx(0)+C05*u_p[0].dx(1))   \
 >>>>>>> 04712097b920beb71cfc18eaaf11c9449a222670
-    +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
-    +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
-    +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
-    +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
-    +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
-    + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx - f[i]*v[i]*dx
+    +v[2].dx(2)*(C20*u_p[0].dx(0)+C21*u_p[1].dx(1)+C22*u_p[2].dx(2)+C23*u_p[1].dx(2)+C24*u_p[2].dx(0)+C25*u_p[0].dx(1))   \
+    +(v[1].dx(0)+v[0].dx(1))*(C50*u_p[0].dx(0)+C51*u_p[1].dx(1)+C52*u_p[2].dx(2)+C53*u_p[1].dx(2)+C54*u_p[2].dx(0)+C55*u_p[0].dx(1)) \
+    +(v[2].dx(0)+v[0].dx(2))*(C40*u_p[0].dx(0)+C41*u_p[1].dx(1)+C42*u_p[2].dx(2)+C43*u_p[1].dx(2)+C44*u_p[2].dx(0)+C45*u_p[0].dx(1)) \
+    +v[1].dx(1)*(C10*u_p[0].dx(0)+C11*u_p[1].dx(1)+C12*u_p[2].dx(2)+C13*u_p[1].dx(2)+C14*u_p[2].dx(0)+C15*u_p[0].dx(1))   \
+    +(v[2].dx(1)+v[1].dx(2))*(C30*u_p[0].dx(0)+C31*u_p[1].dx(1)+C32*u_p[2].dx(2)+C33*u_p[1].dx(2)+C34*u_p[2].dx(0)+C35*u_p[0].dx(1)))*dx \
+    + v[i].dx(i)*p*dx + q*u_p[i].dx(i)*dx - f[i]*v[i]*dx
 
+l_p=f[i]*v[i]
 
 #This is the isotropic Stokes flow case
 #F=nu*(u[j].dx(i)*v[j].dx(i))*dx +  v[i].dx(i)*p*dx + q*u[i].dx(i)*dx -f[i]*v[i]*dx+ 10e-16*p*q*dx
@@ -264,12 +267,12 @@ class PicardSolver
    #F -> bilinear form
    #l -> linear form
    #u -> Function() to solve for.
-   #nu0 -> i
+   #nu0 -> initial viscosity
    def __init__(self,F,lf=None,u,nu0=Constant(1.0),max_iter=10,max_u_err=0.005):
       self.F=F
       self.l=l
       self.u=u
-      self.nu0=nu0
+      self.nu=nu0
       self.max_iter=max_iter
       self.max_u_err=max_u_err
       if lf=None: self.lf=Constant((0.0,0.0,0.0))*
@@ -284,14 +287,8 @@ class PicardSolver
          U_k=Uv
          #Define bilinear and linear form. Use viscosity nu. Is constant if first iteration.
          #If not first iteration, is found by solving this variational form for viscoisty.
-         (u,pi)=TestFunctions(Y)
-         F=    nu*(v[0].dx(0)*(C00*u[0].dx(0)+C01*u[1].dx(1)+C02*u[2].dx(2)+C03*u[1].dx(2)+C04*u[2].dx(0)+C05*u[0].dx(1))   \
-         +v[2].dx(2)*(C20*u[0].dx(0)+C21*u[1].dx(1)+C22*u[2].dx(2)+C23*u[1].dx(2)+C24*u[2].dx(0)+C25*u[0].dx(1))   \
-         +(v[1].dx(0)+v[0].dx(1))*(C50*u[0].dx(0)+C51*u[1].dx(1)+C52*u[2].dx(2)+C53*u[1].dx(2)+C54*u[2].dx(0)+C55*u[0].dx(1)) \
-         +(v[2].dx(0)+v[0].dx(2))*(C40*u[0].dx(0)+C41*u[1].dx(1)+C42*u[2].dx(2)+C43*u[1].dx(2)+C44*u[2].dx(0)+C45*u[0].dx(1)) \
-         +v[1].dx(1)*(C10*u[0].dx(0)+C11*u[1].dx(1)+C12*u[2].dx(2)+C13*u[1].dx(2)+C14*u[2].dx(0)+C15*u[0].dx(1))   \
-         +(v[2].dx(1)+v[1].dx(2))*(C30*u[0].dx(0)+C31*u[1].dx(1)+C32*u[2].dx(2)+C33*u[1].dx(2)+C34*u[2].dx(0)+C35*u[0].dx(1)))*dx \
-         + v[i].dx(i)*p*dx + q*u[i].dx(i)*dx 
+         replace(L,nu:nu)
+         
       
          solve(F==lf,U,bc)
          Uv,P=U.split()
