@@ -291,7 +291,7 @@ class PicardSolver
          
       
          solve(F==lf,U,bc)
-         Uv,P=U.split()
+         Uv,P=self.U.split()
          
          #Compute the error. Break if good.
          if i>0: u_err = errornorm(Uk,Uv,"L2")
