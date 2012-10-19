@@ -275,7 +275,9 @@ class PicardSolver
       self.nu=nu0
       self.max_iter=max_iter
       self.max_u_err=max_u_err
-      if lf=None: self.lf=Constant((0.0,0.0,0.0))*
+      if lf=None: self.lf=Constant((0.0,0.0,0.0))*self.v
+      self.solver_parameters
+
    def solve(self)
 
       ############################
